@@ -52,9 +52,9 @@ impl NoteApp {
     pub fn load_notes(&mut self) -> Result<(), String> {
         // 먼저 인덱스와 파일 시스템 동기화
         self.sync_with_filesystem()?;
-        
-        let entries = fs::read_dir(&self.notes_dir)
-            .map_err(|e| format!("디렉토리 읽기 실패: {}", e))?;
+
+        let entries =
+            fs::read_dir(&self.notes_dir).map_err(|e| format!("디렉토리 읽기 실패: {}", e))?;
 
         for entry in entries {
             let entry = entry.map_err(|e| format!("엔트리 읽기 실패: {}", e))?;
@@ -62,7 +62,7 @@ impl NoteApp {
 
             if path.extension().and_then(|s| s.to_str()) == Some("md") {
                 let filename = entry.file_name().to_string_lossy().to_string();
-                
+
                 // 인덱스에서 UUID 찾기 또는 새로 생성
                 let (id, is_new) = if let Some((id, _)) = self.index.find_by_filename(&filename) {
                     (id, false)
@@ -86,19 +86,22 @@ impl NoteApp {
                         let entry = IndexEntry {
                             filename: filename.clone(),
                             title: note.meta.title.clone(),
-                            created_at: if is_new { note.meta.created_at } else {
-                                self.index.get_entry(&id)
+                            created_at: if is_new {
+                                note.meta.created_at
+                            } else {
+                                self.index
+                                    .get_entry(&id)
                                     .map(|e| e.created_at)
                                     .unwrap_or(note.meta.created_at)
                             },
                             updated_at: note.meta.updated_at,
                             tags: if is_new { Vec::new() } else { tags },
                         };
-                        
+
                         if is_new {
                             println!("📄 새 노트 발견: {}", filename);
                         }
-                        
+
                         self.index.add_entry(id, entry);
                         self.notes.insert(id, note);
                     }
@@ -118,19 +121,19 @@ impl NoteApp {
     pub fn sync_with_filesystem(&mut self) -> Result<(), String> {
         // 1. 현재 파일 목록 가져오기
         let mut existing_files = std::collections::HashSet::new();
-        let entries = fs::read_dir(&self.notes_dir)
-            .map_err(|e| format!("디렉토리 읽기 실패: {}", e))?;
-        
+        let entries =
+            fs::read_dir(&self.notes_dir).map_err(|e| format!("디렉토리 읽기 실패: {}", e))?;
+
         for entry in entries {
             let entry = entry.map_err(|e| format!("엔트리 읽기 실패: {}", e))?;
             let path = entry.path();
-            
+
             if path.extension().and_then(|s| s.to_str()) == Some("md") {
                 let filename = entry.file_name().to_string_lossy().to_string();
                 existing_files.insert(filename);
             }
         }
-        
+
         // 2. 인덱스에서 삭제된 파일 제거
         let mut to_remove = Vec::new();
         for (id, entry) in self.index.mappings.iter() {
@@ -139,18 +142,18 @@ impl NoteApp {
                 to_remove.push(*id);
             }
         }
-        
-        for id in to_remove {
-            self.index.remove_entry(&id);
-            self.shortcuts.remove_shortcuts(&id);
+
+        for id in &to_remove {
+            self.index.remove_entry(id);
+            self.shortcuts.remove_shortcuts(id);
         }
-        
+
         if !to_remove.is_empty() {
             self.save_index()?;
             self.save_shortcuts()?;
             println!("✅ 인덱스 정리 완료: {}개 항목 제거", to_remove.len());
         }
-        
+
         Ok(())
     }
 
@@ -180,9 +183,12 @@ impl NoteApp {
         self.notes
             .iter()
             .filter(|(_, note)| {
-                note.meta.title.to_lowercase().contains(&query_lower) ||
-                note.content.to_lowercase().contains(&query_lower) ||
-                note.tags.iter().any(|tag| tag.to_lowercase().contains(&query_lower))
+                note.meta.title.to_lowercase().contains(&query_lower)
+                    || note.content.to_lowercase().contains(&query_lower)
+                    || note
+                        .tags
+                        .iter()
+                        .any(|tag| tag.to_lowercase().contains(&query_lower))
             })
             .collect()
     }
@@ -202,13 +208,13 @@ impl NoteApp {
 
     pub fn get_all_tags(&self) -> Vec<String> {
         let mut tags = std::collections::HashSet::new();
-        
+
         for note in self.notes.values() {
             for tag in &note.tags {
                 tags.insert(tag.clone());
             }
         }
-        
+
         let mut sorted_tags: Vec<_> = tags.into_iter().collect();
         sorted_tags.sort();
         sorted_tags

@@ -1,6 +1,6 @@
 mod app;
-mod note;
 mod index;
+mod note;
 mod shortcuts;
 
 use app::NoteApp;
@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("📂 노트 디렉토리: {}", notes_dir.display());
 
     // 앱 초기화
-    let mut app = NoteApp::new(notes_dir)?;
+    let mut app = NoteApp::new(notes_dir.clone())?;
 
     // 시작 시 목록 표시
     show_notes_list(&app);
@@ -80,7 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn show_notes_list(app: &NoteApp) {
     let notes = app.list_notes();
-    
+
     if notes.is_empty() {
         println!("\n📭 노트가 없습니다.");
         return;
@@ -140,11 +140,11 @@ fn show_note_detail(app: &NoteApp, number_str: &str) {
         println!("파일: {}", note.filename);
         println!("생성: {}", note.meta.created_at.format("%Y-%m-%d %H:%M"));
         println!("수정: {}", note.meta.updated_at.format("%Y-%m-%d %H:%M"));
-        
+
         if let Some(folder) = note.get_folder_tag() {
             println!("📁 폴더: {}", folder);
         }
-        
+
         let tags = note.get_regular_tags();
         if !tags.is_empty() {
             println!("🏷️  태그: {}", tags.join(", "));
@@ -158,11 +158,10 @@ fn show_note_detail(app: &NoteApp, number_str: &str) {
                     let target_str = match &shortcut.target {
                         crate::note::LinkTarget::Url { url } => url.clone(),
                         crate::note::LinkTarget::File { path } => path.display().to_string(),
-                        crate::note::LinkTarget::Note { id } => {
-                            app.get_note(id)
-                                .map(|n| n.meta.title.clone())
-                                .unwrap_or_else(|| format!("(노트 {})", id))
-                        }
+                        crate::note::LinkTarget::Note { id } => app
+                            .get_note(id)
+                            .map(|n| n.meta.title.clone())
+                            .unwrap_or_else(|| format!("(노트 {})", id)),
                     };
                     println!("   {} → {}", alias, target_str);
                 }
@@ -178,7 +177,7 @@ fn show_note_detail(app: &NoteApp, number_str: &str) {
 
 fn search_notes(app: &NoteApp, query: &str) {
     let results = app.search_notes(query);
-    
+
     if results.is_empty() {
         println!("🔍 '{}' 검색 결과가 없습니다.", query);
         return;
@@ -188,8 +187,12 @@ fn search_notes(app: &NoteApp, query: &str) {
     println!("{:-<60}", "");
 
     for (id, note) in results {
-        println!("📝 {} - {}", note.meta.title, note.meta.updated_at.format("%Y-%m-%d"));
-        
+        println!(
+            "📝 {} - {}",
+            note.meta.title,
+            note.meta.updated_at.format("%Y-%m-%d")
+        );
+
         // 내용 미리보기 (첫 50자)
         let preview: String = note.content.chars().take(50).collect();
         if !preview.is_empty() {
@@ -201,7 +204,8 @@ fn search_notes(app: &NoteApp, query: &str) {
 fn show_tags(app: &NoteApp) {
     let folders = app.get_folders();
     let all_tags = app.get_all_tags();
-    let regular_tags: Vec<_> = all_tags.iter()
+    let regular_tags: Vec<_> = all_tags
+        .iter()
         .filter(|tag| !tag.starts_with('@'))
         .collect();
 
@@ -218,7 +222,7 @@ fn show_tags(app: &NoteApp) {
 
     if !regular_tags.is_empty() {
         println!("\n🏷️  일반 태그:");
-        for tag in regular_tags {
+        for tag in &regular_tags {
             let count = app.index.find_by_tag(tag).len();
             println!("   {} ({} 개)", tag, count);
         }
