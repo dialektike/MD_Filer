@@ -22,8 +22,6 @@ pub struct Shortcut {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NoteMeta {
     pub title: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone)]
@@ -31,6 +29,8 @@ pub struct Note {
     pub id: Uuid,
     pub filename: String,
     pub meta: NoteMeta,
+    pub created_at: DateTime<Utc>, // 인덱스에서 관리
+    pub updated_at: DateTime<Utc>, // 인덱스에서 관리
     pub content: String,
     pub tags: Vec<String>, // 인덱스에서 로드된 태그
 }
@@ -42,6 +42,8 @@ impl Note {
         filename: String,
         content: String,
         tags: Vec<String>,
+        created_at: DateTime<Utc>,
+        updated_at: DateTime<Utc>,
     ) -> Result<Self, String> {
         if let Some((frontmatter, body)) = Self::split_frontmatter(&content) {
             let meta: NoteMeta =
@@ -51,6 +53,8 @@ impl Note {
                 id,
                 filename,
                 meta,
+                created_at,
+                updated_at,
                 content: body,
                 tags,
             })
@@ -59,15 +63,12 @@ impl Note {
             let title = Self::extract_title_from_content(&content)
                 .unwrap_or_else(|| filename.trim_end_matches(".md").to_string());
 
-            let now = Utc::now();
             Ok(Note {
                 id,
                 filename: filename.clone(),
-                meta: NoteMeta {
-                    title,
-                    created_at: now,
-                    updated_at: now,
-                },
+                meta: NoteMeta { title },
+                created_at,
+                updated_at,
                 content,
                 tags,
             })
@@ -124,8 +125,6 @@ mod tests {
     fn test_parse_note_with_frontmatter() {
         let content = r#"---
 title: Test Note
-created_at: 2024-01-01T00:00:00Z
-updated_at: 2024-01-02T00:00:00Z
 ---
 
 # Test Content
@@ -134,9 +133,16 @@ This is a test note."#;
 
         let id = Uuid::new_v4();
         let tags = vec!["test".to_string(), "@folder".to_string()];
-        let note =
-            Note::from_markdown(id, "test.md".to_string(), content.to_string(), tags.clone())
-                .unwrap();
+        let now = Utc::now();
+        let note = Note::from_markdown(
+            id,
+            "test.md".to_string(),
+            content.to_string(),
+            tags.clone(),
+            now,
+            now,
+        )
+        .unwrap();
 
         assert_eq!(note.meta.title, "Test Note");
         assert_eq!(note.filename, "test.md");
@@ -151,8 +157,16 @@ This is a test note."#;
 This is content without frontmatter."#;
 
         let id = Uuid::new_v4();
-        let note =
-            Note::from_markdown(id, "test.md".to_string(), content.to_string(), vec![]).unwrap();
+        let now = Utc::now();
+        let note = Note::from_markdown(
+            id,
+            "test.md".to_string(),
+            content.to_string(),
+            vec![],
+            now,
+            now,
+        )
+        .unwrap();
 
         assert_eq!(note.meta.title, "My Title");
         assert_eq!(note.filename, "test.md");
@@ -163,8 +177,16 @@ This is content without frontmatter."#;
         let content = "Just some content.";
 
         let id = Uuid::new_v4();
-        let note =
-            Note::from_markdown(id, "myfile.md".to_string(), content.to_string(), vec![]).unwrap();
+        let now = Utc::now();
+        let note = Note::from_markdown(
+            id,
+            "myfile.md".to_string(),
+            content.to_string(),
+            vec![],
+            now,
+            now,
+        )
+        .unwrap();
 
         assert_eq!(note.meta.title, "myfile");
         assert_eq!(note.filename, "myfile.md");
@@ -178,8 +200,16 @@ This is content without frontmatter."#;
             "@projects".to_string(),
             "tag2".to_string(),
         ];
-        let note =
-            Note::from_markdown(id, "test.md".to_string(), "# Test".to_string(), tags).unwrap();
+        let now = Utc::now();
+        let note = Note::from_markdown(
+            id,
+            "test.md".to_string(),
+            "# Test".to_string(),
+            tags,
+            now,
+            now,
+        )
+        .unwrap();
 
         assert_eq!(note.get_folder_tag(), Some("@projects"));
     }
@@ -192,8 +222,16 @@ This is content without frontmatter."#;
             "@work".to_string(),
             "programming".to_string(),
         ];
-        let note =
-            Note::from_markdown(id, "test.md".to_string(), "# Test".to_string(), tags).unwrap();
+        let now = Utc::now();
+        let note = Note::from_markdown(
+            id,
+            "test.md".to_string(),
+            "# Test".to_string(),
+            tags,
+            now,
+            now,
+        )
+        .unwrap();
 
         let regular_tags = note.get_regular_tags();
         assert_eq!(regular_tags.len(), 2);
@@ -206,15 +244,21 @@ This is content without frontmatter."#;
     fn test_to_markdown() {
         let content = r#"---
 title: Test Note
-created_at: 2024-01-01T00:00:00Z
-updated_at: 2024-01-02T00:00:00Z
 ---
 
 # Test Content"#;
 
         let id = Uuid::new_v4();
-        let note =
-            Note::from_markdown(id, "test.md".to_string(), content.to_string(), vec![]).unwrap();
+        let now = Utc::now();
+        let note = Note::from_markdown(
+            id,
+            "test.md".to_string(),
+            content.to_string(),
+            vec![],
+            now,
+            now,
+        )
+        .unwrap();
         let markdown = note.to_markdown();
 
         assert!(markdown.starts_with("---\n"));

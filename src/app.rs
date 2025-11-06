@@ -76,28 +76,30 @@ impl NoteApp {
                 let content = fs::read_to_string(&path)
                     .map_err(|e| format!("파일 읽기 실패 {}: {}", filename, e))?;
 
-                // 인덱스에서 태그 가져오기 (없으면 빈 배열)
-                let tags = if let Some(entry) = self.index.get_entry(&id) {
-                    entry.tags.clone()
+                // 인덱스에서 태그와 타임스탬프 가져오기
+                let now = Utc::now();
+                let (tags, created_at, updated_at) = if let Some(entry) = self.index.get_entry(&id)
+                {
+                    (entry.tags.clone(), entry.created_at, now)
                 } else {
-                    Vec::new()
+                    (Vec::new(), now, now)
                 };
 
-                match Note::from_markdown(id, filename.clone(), content, tags.clone()) {
+                match Note::from_markdown(
+                    id,
+                    filename.clone(),
+                    content,
+                    tags.clone(),
+                    created_at,
+                    updated_at,
+                ) {
                     Ok(note) => {
                         // 인덱스 업데이트 (새 파일이거나 메타데이터 변경 시)
                         let entry = IndexEntry {
                             filename: filename.clone(),
                             title: note.meta.title.clone(),
-                            created_at: if is_new {
-                                note.meta.created_at
-                            } else {
-                                self.index
-                                    .get_entry(&id)
-                                    .map(|e| e.created_at)
-                                    .unwrap_or(note.meta.created_at)
-                            },
-                            updated_at: note.meta.updated_at,
+                            created_at: note.created_at,
+                            updated_at: note.updated_at,
                             tags: if is_new { Vec::new() } else { tags },
                         };
 
@@ -173,7 +175,7 @@ impl NoteApp {
     pub fn list_notes(&self) -> Vec<(&Uuid, &Note)> {
         let mut notes: Vec<_> = self.notes.iter().collect();
         // 최신순으로 정렬
-        notes.sort_by(|a, b| b.1.meta.updated_at.cmp(&a.1.meta.updated_at));
+        notes.sort_by(|a, b| b.1.updated_at.cmp(&a.1.updated_at));
         notes
     }
 

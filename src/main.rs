@@ -114,7 +114,7 @@ fn show_notes_list(app: &NoteApp) {
             "{:3}. {} {} {} {}{}",
             idx + 1,
             note.meta.title,
-            note.meta.updated_at.format("%Y-%m-%d"),
+            note.updated_at.format("%Y-%m-%d"),
             folder,
             tags_str,
             shortcuts_str
@@ -138,8 +138,8 @@ fn show_note_detail(app: &NoteApp, number_str: &str) {
         println!("{:-<60}", "");
         println!("제목: {}", note.meta.title);
         println!("파일: {}", note.filename);
-        println!("생성: {}", note.meta.created_at.format("%Y-%m-%d %H:%M"));
-        println!("수정: {}", note.meta.updated_at.format("%Y-%m-%d %H:%M"));
+        println!("생성: {}", note.created_at.format("%Y-%m-%d %H:%M"));
+        println!("수정: {}", note.updated_at.format("%Y-%m-%d %H:%M"));
 
         if let Some(folder) = note.get_folder_tag() {
             println!("📁 폴더: {}", folder);
@@ -190,7 +190,7 @@ fn search_notes(app: &NoteApp, query: &str) {
         println!(
             "📝 {} - {}",
             note.meta.title,
-            note.meta.updated_at.format("%Y-%m-%d")
+            note.updated_at.format("%Y-%m-%d")
         );
 
         // 내용 미리보기 (첫 50자)

@@ -1,7 +1,5 @@
 ---
 title: Project Ideas
-created_at: 2024-02-01T09:00:00Z
-updated_at: 2024-02-05T16:20:00Z
 ---
 
 # Project Ideas

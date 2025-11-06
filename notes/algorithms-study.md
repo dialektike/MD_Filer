@@ -1,7 +1,5 @@
 ---
 title: Algorithms Study Notes
-created_at: 2024-01-10T08:00:00Z
-updated_at: 2024-02-08T11:30:00Z
 ---
 
 # Algorithms Study Notes

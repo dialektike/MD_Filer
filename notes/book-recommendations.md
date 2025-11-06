@@ -1,7 +1,5 @@
 ---
 title: Book Recommendations
-created_at: 2024-01-05T12:00:00Z
-updated_at: 2024-02-10T10:15:00Z
 ---
 
 # Book Recommendations
