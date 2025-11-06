@@ -1,0 +1,19 @@
+[package]
+name = "MD_Filer"
+version = "0.1.0"
+edition = "2024"
+description = "An app for managing md files, written in Rust."
+authors = ["Jae-Hwan Chung <dialektike@gmail.com>"]
+license = "mit"
+repository = "https://github.com/dialektike/MD_Filer"
+readme = "README.md"
+keywords = ["md files", "markdown", "file management", "rust"]
+categories = ["command-line-utilities"]
+
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+serde_json = "1.0"
+uuid = { version = "1.0", features = ["v4", "serde"] }
