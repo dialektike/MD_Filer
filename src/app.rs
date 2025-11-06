@@ -53,6 +53,9 @@ impl NoteApp {
         // 먼저 인덱스와 파일 시스템 동기화
         self.sync_with_filesystem()?;
 
+        // 기존 노트 초기화
+        self.notes.clear();
+
         let entries =
             fs::read_dir(&self.notes_dir).map_err(|e| format!("디렉토리 읽기 실패: {}", e))?;
 

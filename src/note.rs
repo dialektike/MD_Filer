@@ -32,16 +32,21 @@ pub struct Note {
     pub filename: String,
     pub meta: NoteMeta,
     pub content: String,
-    pub tags: Vec<String>,  // 인덱스에서 로드된 태그
+    pub tags: Vec<String>, // 인덱스에서 로드된 태그
 }
 
 impl Note {
     // 마크다운 파일 파싱
-    pub fn from_markdown(id: Uuid, filename: String, content: String, tags: Vec<String>) -> Result<Self, String> {
+    pub fn from_markdown(
+        id: Uuid,
+        filename: String,
+        content: String,
+        tags: Vec<String>,
+    ) -> Result<Self, String> {
         if let Some((frontmatter, body)) = Self::split_frontmatter(&content) {
-            let meta: NoteMeta = serde_yaml::from_str(&frontmatter)
-                .map_err(|e| format!("YAML 파싱 오류: {}", e))?;
-            
+            let meta: NoteMeta =
+                serde_yaml::from_str(&frontmatter).map_err(|e| format!("YAML 파싱 오류: {}", e))?;
+
             Ok(Note {
                 id,
                 filename,
@@ -53,7 +58,7 @@ impl Note {
             // frontmatter가 없는 경우 - 기본 메타데이터 생성
             let title = Self::extract_title_from_content(&content)
                 .unwrap_or_else(|| filename.trim_end_matches(".md").to_string());
-            
+
             let now = Utc::now();
             Ok(Note {
                 id,
@@ -90,14 +95,16 @@ impl Note {
 
     // 폴더 태그 가져오기 (@로 시작하는 태그)
     pub fn get_folder_tag(&self) -> Option<&str> {
-        self.tags.iter()
+        self.tags
+            .iter()
             .find(|tag| tag.starts_with('@'))
             .map(|s| s.as_str())
     }
 
     // 일반 태그들 가져오기 (@로 시작하지 않는 태그)
     pub fn get_regular_tags(&self) -> Vec<&str> {
-        self.tags.iter()
+        self.tags
+            .iter()
             .filter(|tag| !tag.starts_with('@'))
             .map(|s| s.as_str())
             .collect()
@@ -106,5 +113,112 @@ impl Note {
     pub fn to_markdown(&self) -> String {
         let frontmatter = serde_yaml::to_string(&self.meta).unwrap_or_default();
         format!("---\n{}---\n\n{}", frontmatter, self.content)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_note_with_frontmatter() {
+        let content = r#"---
+title: Test Note
+created_at: 2024-01-01T00:00:00Z
+updated_at: 2024-01-02T00:00:00Z
+---
+
+# Test Content
+
+This is a test note."#;
+
+        let id = Uuid::new_v4();
+        let tags = vec!["test".to_string(), "@folder".to_string()];
+        let note =
+            Note::from_markdown(id, "test.md".to_string(), content.to_string(), tags.clone())
+                .unwrap();
+
+        assert_eq!(note.meta.title, "Test Note");
+        assert_eq!(note.filename, "test.md");
+        assert_eq!(note.tags, tags);
+        assert!(note.content.contains("# Test Content"));
+    }
+
+    #[test]
+    fn test_parse_note_without_frontmatter() {
+        let content = r#"# My Title
+
+This is content without frontmatter."#;
+
+        let id = Uuid::new_v4();
+        let note =
+            Note::from_markdown(id, "test.md".to_string(), content.to_string(), vec![]).unwrap();
+
+        assert_eq!(note.meta.title, "My Title");
+        assert_eq!(note.filename, "test.md");
+    }
+
+    #[test]
+    fn test_parse_note_without_frontmatter_or_title() {
+        let content = "Just some content.";
+
+        let id = Uuid::new_v4();
+        let note =
+            Note::from_markdown(id, "myfile.md".to_string(), content.to_string(), vec![]).unwrap();
+
+        assert_eq!(note.meta.title, "myfile");
+        assert_eq!(note.filename, "myfile.md");
+    }
+
+    #[test]
+    fn test_get_folder_tag() {
+        let id = Uuid::new_v4();
+        let tags = vec![
+            "tag1".to_string(),
+            "@projects".to_string(),
+            "tag2".to_string(),
+        ];
+        let note =
+            Note::from_markdown(id, "test.md".to_string(), "# Test".to_string(), tags).unwrap();
+
+        assert_eq!(note.get_folder_tag(), Some("@projects"));
+    }
+
+    #[test]
+    fn test_get_regular_tags() {
+        let id = Uuid::new_v4();
+        let tags = vec![
+            "rust".to_string(),
+            "@work".to_string(),
+            "programming".to_string(),
+        ];
+        let note =
+            Note::from_markdown(id, "test.md".to_string(), "# Test".to_string(), tags).unwrap();
+
+        let regular_tags = note.get_regular_tags();
+        assert_eq!(regular_tags.len(), 2);
+        assert!(regular_tags.contains(&"rust"));
+        assert!(regular_tags.contains(&"programming"));
+        assert!(!regular_tags.contains(&"@work"));
+    }
+
+    #[test]
+    fn test_to_markdown() {
+        let content = r#"---
+title: Test Note
+created_at: 2024-01-01T00:00:00Z
+updated_at: 2024-01-02T00:00:00Z
+---
+
+# Test Content"#;
+
+        let id = Uuid::new_v4();
+        let note =
+            Note::from_markdown(id, "test.md".to_string(), content.to_string(), vec![]).unwrap();
+        let markdown = note.to_markdown();
+
+        assert!(markdown.starts_with("---\n"));
+        assert!(markdown.contains("title: Test Note"));
+        assert!(markdown.contains("# Test Content"));
     }
 }
