@@ -50,6 +50,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 show_note_detail(&app, parts[1]);
             }
+            // 숫자만 입력한 경우 show 명령으로 처리
+            num if num.parse::<usize>().is_ok() => {
+                show_note_detail(&app, num);
+            }
             "se" | "search" => {
                 if parts.len() < 2 {
                     println!("❌ 사용법: search <검색어>");
