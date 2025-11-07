@@ -117,6 +117,7 @@ impl Note {
     }
 
     // 컨텐츠에서 태그 추출 (#tag 또는 @folder 형식)
+    #[allow(dead_code)]
     pub fn extract_tags_from_content(content: &str) -> Vec<String> {
         use std::collections::HashSet;
         let mut tags = HashSet::new();
