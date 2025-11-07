@@ -179,3 +179,102 @@ updated_at: 2024-01-01T00:00:00Z
     assert_eq!(folders.len(), 1);
     assert_eq!(folders[0], "@projects");
 }
+
+#[test]
+fn test_uuid_injection_for_files_without_uuid() {
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let notes_dir = temp_dir.path().to_path_buf();
+
+    // UUID가 없는 노트 생성
+    create_test_note(
+        &notes_dir,
+        "no-uuid.md",
+        r#"---
+title: Note Without UUID
+---
+
+# Content
+
+This note has no UUID in frontmatter."#,
+    );
+
+    // 앱 생성 (UUID 자동 주입됨)
+    let app = MD_Filer::app::NoteApp::new(notes_dir.clone()).expect("Failed to create app");
+    assert_eq!(app.list_notes().len(), 1);
+
+    // 파일 다시 읽어서 UUID가 추가되었는지 확인
+    let file_path = notes_dir.join("no-uuid.md");
+    let content = fs::read_to_string(&file_path).expect("Failed to read file");
+
+    // UUID가 frontmatter에 있는지 확인
+    assert!(content.contains("id:"));
+    assert!(MD_Filer::note::Note::has_uuid_in_frontmatter(&content));
+}
+
+#[test]
+fn test_uuid_preservation_for_files_with_uuid() {
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let notes_dir = temp_dir.path().to_path_buf();
+
+    let test_uuid = "550e8400-e29b-41d4-a716-446655440000";
+
+    // UUID가 이미 있는 노트 생성
+    create_test_note(
+        &notes_dir,
+        "with-uuid.md",
+        &format!(
+            r#"---
+title: Note With UUID
+id: {}
+---
+
+# Content
+
+This note already has a UUID."#,
+            test_uuid
+        ),
+    );
+
+    // 앱 생성
+    let app = MD_Filer::app::NoteApp::new(notes_dir.clone()).expect("Failed to create app");
+    assert_eq!(app.list_notes().len(), 1);
+
+    // 노트의 UUID가 원본과 같은지 확인
+    let note = app.list_notes()[0].1;
+    assert_eq!(note.id.to_string(), test_uuid);
+
+    // 파일을 다시 읽어서 UUID가 변경되지 않았는지 확인
+    let file_path = notes_dir.join("with-uuid.md");
+    let content = fs::read_to_string(&file_path).expect("Failed to read file");
+    assert!(content.contains(test_uuid));
+}
+
+#[test]
+fn test_frontmatter_creation_for_files_without_frontmatter() {
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let notes_dir = temp_dir.path().to_path_buf();
+
+    // Frontmatter가 전혀 없는 노트 생성
+    create_test_note(
+        &notes_dir,
+        "no-frontmatter.md",
+        r#"# Just a Title
+
+This is content without any frontmatter."#,
+    );
+
+    // 앱 생성 (frontmatter와 UUID 자동 추가됨)
+    let app = MD_Filer::app::NoteApp::new(notes_dir.clone()).expect("Failed to create app");
+    assert_eq!(app.list_notes().len(), 1);
+
+    // 파일 다시 읽기
+    let file_path = notes_dir.join("no-frontmatter.md");
+    let content = fs::read_to_string(&file_path).expect("Failed to read file");
+
+    // Frontmatter가 생성되었는지 확인
+    assert!(content.starts_with("---\n"));
+    assert!(content.contains("title:"));
+    assert!(content.contains("id:"));
+    assert!(MD_Filer::note::Note::has_frontmatter(&content));
+    assert!(MD_Filer::note::Note::has_uuid_in_frontmatter(&content));
+}
