@@ -21,7 +21,8 @@ pub struct Shortcut {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NoteMeta {
-    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>, // 옵션으로 변경
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<Uuid>, // 파일에 저장된 UUID (옵션)
 }
@@ -31,6 +32,7 @@ pub struct Note {
     pub id: Uuid,
     pub filename: String,
     pub meta: NoteMeta,
+    pub title: String,             // 실제 title (항상 존재)
     pub created_at: DateTime<Utc>, // 인덱스에서 관리
     pub updated_at: DateTime<Utc>, // 인덱스에서 관리
     pub content: String,
@@ -54,13 +56,22 @@ impl Note {
             // 파일에 UUID가 있으면 사용, 없으면 매개변수의 UUID 사용
             let actual_id = meta.id.unwrap_or(id);
 
-            // meta에 UUID 설정 (파일에 저장할 준비)
+            // title이 없으면 자동 생성
+            let title = meta
+                .title
+                .clone()
+                .or_else(|| Self::extract_title_from_content(&body))
+                .unwrap_or_else(|| filename.trim_end_matches(".md").to_string());
+
+            // meta에 UUID와 title 설정 (파일에 저장할 준비)
             meta.id = Some(actual_id);
+            meta.title = Some(title.clone());
 
             Ok(Note {
                 id: actual_id,
                 filename,
                 meta,
+                title,
                 created_at,
                 updated_at,
                 content: body,
@@ -75,9 +86,10 @@ impl Note {
                 id,
                 filename: filename.clone(),
                 meta: NoteMeta {
-                    title,
+                    title: Some(title.clone()),
                     id: Some(id), // UUID 포함
                 },
+                title,
                 created_at,
                 updated_at,
                 content,
@@ -170,7 +182,7 @@ This is a test note."#;
         )
         .unwrap();
 
-        assert_eq!(note.meta.title, "Test Note");
+        assert_eq!(note.title, "Test Note");
         assert_eq!(note.filename, "test.md");
         assert_eq!(note.tags, tags);
         assert!(note.content.contains("# Test Content"));
@@ -194,7 +206,7 @@ This is content without frontmatter."#;
         )
         .unwrap();
 
-        assert_eq!(note.meta.title, "My Title");
+        assert_eq!(note.title, "My Title");
         assert_eq!(note.filename, "test.md");
     }
 
@@ -214,7 +226,7 @@ This is content without frontmatter."#;
         )
         .unwrap();
 
-        assert_eq!(note.meta.title, "myfile");
+        assert_eq!(note.title, "myfile");
         assert_eq!(note.filename, "myfile.md");
     }
 

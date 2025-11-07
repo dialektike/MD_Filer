@@ -113,7 +113,7 @@ fn show_notes_list(app: &NoteApp) {
         println!(
             "{:3}. {} {} {} {}{}",
             idx + 1,
-            note.meta.title,
+            note.title,
             note.updated_at.format("%Y-%m-%d"),
             folder,
             tags_str,
@@ -136,7 +136,7 @@ fn show_note_detail(app: &NoteApp, number_str: &str) {
     if let Some((id, note)) = notes.get(index) {
         println!("\n📝 노트 상세");
         println!("{:-<60}", "");
-        println!("제목: {}", note.meta.title);
+        println!("제목: {}", note.title);
         println!("파일: {}", note.filename);
         println!("생성: {}", note.created_at.format("%Y-%m-%d %H:%M"));
         println!("수정: {}", note.updated_at.format("%Y-%m-%d %H:%M"));
@@ -160,7 +160,7 @@ fn show_note_detail(app: &NoteApp, number_str: &str) {
                         crate::note::LinkTarget::File { path } => path.display().to_string(),
                         crate::note::LinkTarget::Note { id } => app
                             .get_note(id)
-                            .map(|n| n.meta.title.clone())
+                            .map(|n| n.title.clone())
                             .unwrap_or_else(|| format!("(노트 {})", id)),
                     };
                     println!("   {} → {}", alias, target_str);
@@ -187,11 +187,7 @@ fn search_notes(app: &NoteApp, query: &str) {
     println!("{:-<60}", "");
 
     for (id, note) in results {
-        println!(
-            "📝 {} - {}",
-            note.meta.title,
-            note.updated_at.format("%Y-%m-%d")
-        );
+        println!("📝 {} - {}", note.title, note.updated_at.format("%Y-%m-%d"));
 
         // 내용 미리보기 (첫 50자)
         let preview: String = note.content.chars().take(50).collect();

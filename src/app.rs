@@ -106,7 +106,7 @@ impl NoteApp {
                         // 인덱스 업데이트 (새 파일이거나 메타데이터 변경 시)
                         let entry = IndexEntry {
                             filename: filename.clone(),
-                            title: note.meta.title.clone(),
+                            title: note.title.clone(),
                             created_at: note.created_at,
                             updated_at: note.updated_at,
                             tags: if is_new { Vec::new() } else { tags },
@@ -203,7 +203,7 @@ impl NoteApp {
         self.notes
             .iter()
             .filter(|(_, note)| {
-                note.meta.title.to_lowercase().contains(&query_lower)
+                note.title.to_lowercase().contains(&query_lower)
                     || note.content.to_lowercase().contains(&query_lower)
                     || note
                         .tags

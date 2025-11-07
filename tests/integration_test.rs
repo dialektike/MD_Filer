@@ -68,7 +68,7 @@ fn test_app_search_notes() {
     // "Rust"로 검색
     let results = app.search_notes("Rust");
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0].1.meta.title, "First Note");
+    assert_eq!(results[0].1.title, "First Note");
 
     // "note"로 검색 (대소문자 무시)
     let results = app.search_notes("note");
@@ -277,4 +277,61 @@ This is content without any frontmatter."#,
     assert!(content.contains("id:"));
     assert!(MD_Filer::note::Note::has_frontmatter(&content));
     assert!(MD_Filer::note::Note::has_uuid_in_frontmatter(&content));
+}
+
+#[test]
+fn test_frontmatter_with_missing_title() {
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let notes_dir = temp_dir.path().to_path_buf();
+
+    // Frontmatter는 있지만 title이 없는 노트
+    create_test_note(
+        &notes_dir,
+        "no-title.md",
+        r#"---
+id: 550e8400-e29b-41d4-a716-446655440000
+---
+
+# Extracted Title
+
+This note has frontmatter but no title field."#,
+    );
+
+    // 앱 생성 (title 자동 추출됨)
+    let app = MD_Filer::app::NoteApp::new(notes_dir.clone()).expect("Failed to create app");
+    assert_eq!(app.list_notes().len(), 1);
+
+    let note = app.list_notes()[0].1;
+
+    // 본문에서 제목이 추출되었는지 확인
+    assert_eq!(note.title, "Extracted Title");
+
+    // UUID가 있으므로 파일은 업데이트되지 않음
+    // title은 메모리와 인덱스에만 존재
+}
+
+#[test]
+fn test_frontmatter_with_empty_content() {
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let notes_dir = temp_dir.path().to_path_buf();
+
+    // Frontmatter는 있지만 title도 본문 제목도 없는 노트
+    create_test_note(
+        &notes_dir,
+        "empty-note.md",
+        r#"---
+id: 550e8400-e29b-41d4-a716-446655440001
+---
+
+Just some plain text without any heading."#,
+    );
+
+    // 앱 생성 (파일명에서 title 추출됨)
+    let app = MD_Filer::app::NoteApp::new(notes_dir.clone()).expect("Failed to create app");
+    assert_eq!(app.list_notes().len(), 1);
+
+    let note = app.list_notes()[0].1;
+
+    // 파일명에서 제목이 생성되었는지 확인
+    assert_eq!(note.title, "empty-note");
 }
