@@ -1,5 +1,6 @@
 ---
 title: Rust Programming Basics
+id: 8efaf13b-8046-4f16-a8ac-d9cac270682b
 ---
 
 # Rust Programming Basics

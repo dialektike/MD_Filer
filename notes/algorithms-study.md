@@ -1,5 +1,6 @@
 ---
 title: Algorithms Study Notes
+id: aea8437f-c73f-4797-9ea3-3210b41aff84
 ---
 
 # Algorithms Study Notes

@@ -88,12 +88,21 @@ impl NoteApp {
                 match Note::from_markdown(
                     id,
                     filename.clone(),
-                    content,
+                    content.clone(),
                     tags.clone(),
                     created_at,
                     updated_at,
                 ) {
                     Ok(note) => {
+                        // UUID가 파일에 없으면 추가
+                        if !Note::has_uuid_in_frontmatter(&content) {
+                            if let Err(e) = self.inject_uuid_to_file(&path, &note) {
+                                eprintln!("⚠️  UUID 주입 실패 {}: {}", filename, e);
+                            } else {
+                                println!("✏️  UUID 추가됨: {} ({})", filename, note.id);
+                            }
+                        }
+
                         // 인덱스 업데이트 (새 파일이거나 메타데이터 변경 시)
                         let entry = IndexEntry {
                             filename: filename.clone(),
@@ -170,6 +179,12 @@ impl NoteApp {
     pub fn save_shortcuts(&self) -> Result<(), String> {
         let shortcuts_path = self.notes_dir.join(".shortcuts.json");
         self.shortcuts.save(&shortcuts_path)
+    }
+
+    // 파일에 UUID 주입
+    fn inject_uuid_to_file(&self, path: &PathBuf, note: &Note) -> Result<(), String> {
+        let markdown = note.to_markdown();
+        fs::write(path, markdown).map_err(|e| format!("파일 쓰기 실패: {}", e))
     }
 
     pub fn list_notes(&self) -> Vec<(&Uuid, &Note)> {

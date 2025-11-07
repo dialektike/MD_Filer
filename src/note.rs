@@ -22,6 +22,8 @@ pub struct Shortcut {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NoteMeta {
     pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<Uuid>, // 파일에 저장된 UUID (옵션)
 }
 
 #[derive(Debug, Clone)]
@@ -46,11 +48,17 @@ impl Note {
         updated_at: DateTime<Utc>,
     ) -> Result<Self, String> {
         if let Some((frontmatter, body)) = Self::split_frontmatter(&content) {
-            let meta: NoteMeta =
+            let mut meta: NoteMeta =
                 serde_yaml::from_str(&frontmatter).map_err(|e| format!("YAML 파싱 오류: {}", e))?;
 
+            // 파일에 UUID가 있으면 사용, 없으면 매개변수의 UUID 사용
+            let actual_id = meta.id.unwrap_or(id);
+
+            // meta에 UUID 설정 (파일에 저장할 준비)
+            meta.id = Some(actual_id);
+
             Ok(Note {
-                id,
+                id: actual_id,
                 filename,
                 meta,
                 created_at,
@@ -66,7 +74,10 @@ impl Note {
             Ok(Note {
                 id,
                 filename: filename.clone(),
-                meta: NoteMeta { title },
+                meta: NoteMeta {
+                    title,
+                    id: Some(id), // UUID 포함
+                },
                 created_at,
                 updated_at,
                 content,
@@ -113,7 +124,22 @@ impl Note {
 
     pub fn to_markdown(&self) -> String {
         let frontmatter = serde_yaml::to_string(&self.meta).unwrap_or_default();
-        format!("---\n{}---\n\n{}", frontmatter, self.content)
+        format!("---\n{}---\n{}", frontmatter, self.content)
+    }
+
+    // frontmatter가 있는지 확인
+    pub fn has_frontmatter(content: &str) -> bool {
+        content.starts_with("---\n")
+    }
+
+    // frontmatter에 UUID가 있는지 확인
+    pub fn has_uuid_in_frontmatter(content: &str) -> bool {
+        if let Some((frontmatter, _)) = Self::split_frontmatter(content) {
+            if let Ok(meta) = serde_yaml::from_str::<NoteMeta>(&frontmatter) {
+                return meta.id.is_some();
+            }
+        }
+        false
     }
 }
 
