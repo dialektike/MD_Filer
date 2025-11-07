@@ -92,22 +92,20 @@ impl NoteApp {
                     let content = fs::read_to_string(&path)
                         .map_err(|e| format!("파일 읽기 실패 {}: {}", filename, e))?;
 
-                    // 컨텐츠에서 태그 추출
-                    let extracted_tags = Note::extract_tags_from_content(&content);
-
-                    // 인덱스에서 타임스탬프 가져오기
+                    // 인덱스에서 타임스탬프와 태그 가져오기
                     let now = Utc::now();
-                    let (created_at, updated_at) = if let Some(entry) = self.index.get_entry(&id) {
-                        (entry.created_at, now)
-                    } else {
-                        (now, now)
-                    };
+                    let (tags, created_at, updated_at) =
+                        if let Some(entry) = self.index.get_entry(&id) {
+                            (entry.tags.clone(), entry.created_at, now)
+                        } else {
+                            (Vec::new(), now, now)
+                        };
 
                     match Note::from_markdown(
                         id,
                         filename.clone(),
                         content.clone(),
-                        extracted_tags.clone(),
+                        tags.clone(),
                         created_at,
                         updated_at,
                     ) {
@@ -121,14 +119,14 @@ impl NoteApp {
                                 }
                             }
 
-                            // 인덱스 업데이트 (추출된 태그 사용)
+                            // 인덱스 업데이트 (기존 태그 유지)
                             let entry = IndexEntry {
                                 filename: filename.clone(),
                                 file_path: file_path.clone(),
                                 title: note.title.clone(),
                                 created_at: note.created_at,
                                 updated_at: note.updated_at,
-                                tags: extracted_tags,
+                                tags: tags,
                             };
 
                             if is_new {

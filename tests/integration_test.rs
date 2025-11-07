@@ -154,12 +154,25 @@ updated_at: 2024-01-01T00:00:00Z
 
 # Tagged Note
 
-Tags: #rust #tutorial @projects"#,
+This is a test note."#,
     );
 
-    let app = MD_Filer::app::NoteApp::new(notes_dir).expect("Failed to create app");
+    let mut app = MD_Filer::app::NoteApp::new(notes_dir).expect("Failed to create app");
 
-    // 태그는 컨텐츠에서 자동으로 추출됨
+    // 인덱스에 태그 수동 추가 (실제로는 별도 명령어로 추가)
+    if let Some(note) = app.list_notes().first() {
+        let id = *note.0;
+        if let Some(entry) = app.index.mappings.get_mut(&id) {
+            entry.tags = vec![
+                "rust".to_string(),
+                "@projects".to_string(),
+                "tutorial".to_string(),
+            ];
+        }
+        // 노트 재로드
+        app.load_notes().expect("Failed to reload");
+    }
+
     let all_tags = app.get_all_tags();
     assert!(all_tags.contains(&"rust".to_string()));
     assert!(all_tags.contains(&"@projects".to_string()));

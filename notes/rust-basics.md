@@ -7,8 +7,6 @@ id: 8efaf13b-8046-4f16-a8ac-d9cac270682b
 
 Rust is a systems programming language focused on safety, speed, and concurrency.
 
-Tags: @programming #rust #learning
-
 ## Key Concepts
 
 ### Ownership
