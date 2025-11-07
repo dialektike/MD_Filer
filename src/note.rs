@@ -1,6 +1,5 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -117,12 +116,56 @@ impl Note {
         None
     }
 
+    // 컨텐츠에서 태그 추출 (#tag 또는 @folder 형식)
+    pub fn extract_tags_from_content(content: &str) -> Vec<String> {
+        use std::collections::HashSet;
+        let mut tags = HashSet::new();
+
+        // 정규식 대신 단순 파싱 사용
+        for line in content.lines() {
+            let words = line.split_whitespace();
+            for word in words {
+                // @folder 형식 태그
+                if word.starts_with('@') && word.len() > 1 {
+                    let tag = word
+                        .trim_end_matches(|c: char| !c.is_alphanumeric() && c != '-' && c != '_');
+                    if tag.len() > 1 {
+                        tags.insert(tag.to_string());
+                    }
+                }
+                // #tag 형식 태그
+                else if word.starts_with('#') && word.len() > 1 {
+                    let tag = word[1..]
+                        .trim_end_matches(|c: char| !c.is_alphanumeric() && c != '-' && c != '_');
+                    if !tag.is_empty() {
+                        tags.insert(tag.to_string());
+                    }
+                }
+            }
+        }
+
+        tags.into_iter().collect()
+    }
+
     // 폴더 태그 가져오기 (@로 시작하는 태그)
     pub fn get_folder_tag(&self) -> Option<&str> {
         self.tags
             .iter()
             .find(|tag| tag.starts_with('@'))
             .map(|s| s.as_str())
+    }
+
+    // 폴더 이름 가져오기 (@ 제거)
+    pub fn get_folder_name(&self) -> Option<String> {
+        self.get_folder_tag()
+            .map(|tag| tag.trim_start_matches('@').to_string())
+    }
+
+    // 폴더 표시용 문자열 (이모지 포함)
+    pub fn get_folder_display(&self) -> String {
+        self.get_folder_name()
+            .map(|name| format!("📁{}", name))
+            .unwrap_or_default()
     }
 
     // 일반 태그들 가져오기 (@로 시작하지 않는 태그)
@@ -140,6 +183,7 @@ impl Note {
     }
 
     // frontmatter가 있는지 확인
+    #[allow(dead_code)]
     pub fn has_frontmatter(content: &str) -> bool {
         content.starts_with("---\n")
     }

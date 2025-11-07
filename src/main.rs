@@ -24,7 +24,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     show_notes_list(&app);
 
     loop {
-        println!("\n명령어: [l]ist, [s]how <번호>, [se]arch <검색어>, [t]ags, [r]efresh, [q]uit");
+        println!(
+            "\n명령어: [l]ist, [s]how <번호>, [se]arch <검색어>, [t]ags, [f]olders, [a]dd-folder <경로>, [r]efresh, [q]uit"
+        );
         print!("> ");
         io::stdout().flush()?;
 
@@ -59,6 +61,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "t" | "tags" => {
                 show_tags(&app);
             }
+            "f" | "folders" => {
+                show_folders(&app);
+            }
+            "a" | "add-folder" => {
+                if parts.len() < 2 {
+                    println!("❌ 사용법: add-folder <경로>");
+                    continue;
+                }
+                let folder_path = parts[1..].join(" ");
+                match app.add_watched_folder(folder_path.clone()) {
+                    Ok(_) => {
+                        println!("✅ 폴더가 추가되었습니다: {}", folder_path);
+                        show_notes_list(&app);
+                    }
+                    Err(e) => println!("❌ {}", e),
+                }
+            }
+            "remove-folder" => {
+                if parts.len() < 2 {
+                    println!("❌ 사용법: remove-folder <경로>");
+                    continue;
+                }
+                let folder_path = parts[1..].join(" ");
+                match app.remove_watched_folder(&folder_path) {
+                    Ok(_) => {
+                        println!("✅ 폴더가 제거되었습니다: {}", folder_path);
+                        show_notes_list(&app);
+                    }
+                    Err(e) => println!("❌ {}", e),
+                }
+            }
             "r" | "refresh" => {
                 println!("🔄 노트 목록 새로고침 중...");
                 app = NoteApp::new(notes_dir.clone())?;
@@ -90,12 +123,13 @@ fn show_notes_list(app: &NoteApp) {
     println!("{:-<60}", "");
 
     for (idx, (id, note)) in notes.iter().enumerate() {
-        let folder = note.get_folder_tag().unwrap_or("");
+        let folder_str = note.get_folder_display();
+
         let tags = note.get_regular_tags();
         let tags_str = if tags.is_empty() {
             String::new()
         } else {
-            format!("[{}]", tags.join(", "))
+            format!("🏷️ {}", tags.join(", "))
         };
 
         // Shortcuts 개수 표시
@@ -105,19 +139,34 @@ fn show_notes_list(app: &NoteApp) {
             0
         };
         let shortcuts_str = if shortcuts_count > 0 {
-            format!(" 🔗{}", shortcuts_count)
+            format!("🔗{}", shortcuts_count)
         } else {
             String::new()
         };
 
+        // 정보 조합
+        let mut info_parts = Vec::new();
+        if !folder_str.is_empty() {
+            info_parts.push(folder_str);
+        }
+        if !tags_str.is_empty() {
+            info_parts.push(tags_str);
+        }
+        if !shortcuts_str.is_empty() {
+            info_parts.push(shortcuts_str);
+        }
+        let info_str = if info_parts.is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", info_parts.join(" "))
+        };
+
         println!(
-            "{:3}. {} {} {} {}{}",
+            "{:3}. {} {}{}",
             idx + 1,
             note.title,
             note.updated_at.format("%Y-%m-%d"),
-            folder,
-            tags_str,
-            shortcuts_str
+            info_str
         );
     }
     println!("{:-<60}", "");
@@ -141,8 +190,8 @@ fn show_note_detail(app: &NoteApp, number_str: &str) {
         println!("생성: {}", note.created_at.format("%Y-%m-%d %H:%M"));
         println!("수정: {}", note.updated_at.format("%Y-%m-%d %H:%M"));
 
-        if let Some(folder) = note.get_folder_tag() {
-            println!("📁 폴더: {}", folder);
+        if let Some(folder_name) = note.get_folder_name() {
+            println!("📁 폴더: {}", folder_name);
         }
 
         let tags = note.get_regular_tags();
@@ -186,7 +235,7 @@ fn search_notes(app: &NoteApp, query: &str) {
     println!("\n🔍 '{}' 검색 결과 ({} 개)", query, results.len());
     println!("{:-<60}", "");
 
-    for (id, note) in results {
+    for (_id, note) in results {
         println!("📝 {} - {}", note.title, note.updated_at.format("%Y-%m-%d"));
 
         // 내용 미리보기 (첫 50자)
@@ -227,4 +276,36 @@ fn show_tags(app: &NoteApp) {
     if folders.is_empty() && regular_tags.is_empty() {
         println!("태그가 없습니다.");
     }
+}
+
+fn show_folders(app: &NoteApp) {
+    let watched_folders = app.list_watched_folders();
+
+    println!("\n📂 관리 중인 폴더 목록");
+    println!("{:-<60}", "");
+
+    if watched_folders.is_empty() {
+        println!("관리 중인 폴더가 없습니다.");
+        return;
+    }
+
+    for (idx, folder_path) in watched_folders.iter().enumerate() {
+        // 해당 폴더의 노트 개수 세기 - index에서 직접 세기
+        let count = app
+            .index
+            .mappings
+            .values()
+            .filter(|entry| {
+                if !entry.file_path.is_empty() {
+                    entry.file_path.starts_with(folder_path)
+                } else {
+                    // 구버전 호환: file_path가 없으면 기본 notes 폴더로 간주
+                    folder_path.contains("notes")
+                }
+            })
+            .count();
+
+        println!("{}. {} ({} 개 노트)", idx + 1, folder_path, count);
+    }
+    println!("{:-<60}", "");
 }

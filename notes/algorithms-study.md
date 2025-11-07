@@ -5,6 +5,8 @@ id: aea8437f-c73f-4797-9ea3-3210b41aff84
 
 # Algorithms Study Notes
 
+Tags: @cs-fundamentals #algorithms #data-structures
+
 ## Sorting Algorithms
 
 ### Quick Sort

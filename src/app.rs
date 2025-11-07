@@ -1,10 +1,10 @@
 use crate::index::{IndexEntry, NoteIndex};
-use crate::note::{Note, NoteMeta};
+use crate::note::Note;
 use crate::shortcuts::ShortcutsRegistry;
 use chrono::Utc;
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use uuid::Uuid;
 
 pub struct NoteApp {
@@ -26,7 +26,7 @@ impl NoteApp {
         let shortcuts_path = notes_dir.join(".shortcuts.json");
 
         // 인덱스와 shortcuts 로드 또는 생성
-        let index = if index_path.exists() {
+        let mut index = if index_path.exists() {
             NoteIndex::load(&index_path)?
         } else {
             NoteIndex::new()
@@ -37,6 +37,12 @@ impl NoteApp {
         } else {
             ShortcutsRegistry::new()
         };
+
+        // 기본 폴더가 watched_folders에 없으면 추가
+        let default_folder = notes_dir.to_string_lossy().to_string();
+        if index.get_watched_folders().is_empty() {
+            index.add_watched_folder(default_folder);
+        }
 
         let mut app = NoteApp {
             notes: HashMap::new(),
@@ -56,71 +62,85 @@ impl NoteApp {
         // 기존 노트 초기화
         self.notes.clear();
 
-        let entries =
-            fs::read_dir(&self.notes_dir).map_err(|e| format!("디렉토리 읽기 실패: {}", e))?;
+        // 모든 watched_folders를 스캔
+        for folder_path in self.index.get_watched_folders().clone() {
+            let folder = PathBuf::from(&folder_path);
+            if !folder.exists() {
+                eprintln!("⚠️  폴더가 존재하지 않습니다: {}", folder_path);
+                continue;
+            }
 
-        for entry in entries {
-            let entry = entry.map_err(|e| format!("엔트리 읽기 실패: {}", e))?;
-            let path = entry.path();
+            let entries = fs::read_dir(&folder)
+                .map_err(|e| format!("디렉토리 읽기 실패 {}: {}", folder_path, e))?;
 
-            if path.extension().and_then(|s| s.to_str()) == Some("md") {
-                let filename = entry.file_name().to_string_lossy().to_string();
+            for entry in entries {
+                let entry = entry.map_err(|e| format!("엔트리 읽기 실패: {}", e))?;
+                let path = entry.path();
 
-                // 인덱스에서 UUID 찾기 또는 새로 생성
-                let (id, is_new) = if let Some((id, _)) = self.index.find_by_filename(&filename) {
-                    (id, false)
-                } else {
-                    (Uuid::new_v4(), true)
-                };
+                if path.extension().and_then(|s| s.to_str()) == Some("md") {
+                    let filename = entry.file_name().to_string_lossy().to_string();
+                    let file_path = path.to_string_lossy().to_string();
 
-                let content = fs::read_to_string(&path)
-                    .map_err(|e| format!("파일 읽기 실패 {}: {}", filename, e))?;
+                    // 인덱스에서 UUID 찾기 또는 새로 생성
+                    let (id, is_new) = if let Some((id, _)) = self.index.find_by_filename(&filename)
+                    {
+                        (id, false)
+                    } else {
+                        (Uuid::new_v4(), true)
+                    };
 
-                // 인덱스에서 태그와 타임스탬프 가져오기
-                let now = Utc::now();
-                let (tags, created_at, updated_at) = if let Some(entry) = self.index.get_entry(&id)
-                {
-                    (entry.tags.clone(), entry.created_at, now)
-                } else {
-                    (Vec::new(), now, now)
-                };
+                    let content = fs::read_to_string(&path)
+                        .map_err(|e| format!("파일 읽기 실패 {}: {}", filename, e))?;
 
-                match Note::from_markdown(
-                    id,
-                    filename.clone(),
-                    content.clone(),
-                    tags.clone(),
-                    created_at,
-                    updated_at,
-                ) {
-                    Ok(note) => {
-                        // UUID가 파일에 없으면 추가
-                        if !Note::has_uuid_in_frontmatter(&content) {
-                            if let Err(e) = self.inject_uuid_to_file(&path, &note) {
-                                eprintln!("⚠️  UUID 주입 실패 {}: {}", filename, e);
-                            } else {
-                                println!("✏️  UUID 추가됨: {} ({})", filename, note.id);
+                    // 컨텐츠에서 태그 추출
+                    let extracted_tags = Note::extract_tags_from_content(&content);
+
+                    // 인덱스에서 타임스탬프 가져오기
+                    let now = Utc::now();
+                    let (created_at, updated_at) = if let Some(entry) = self.index.get_entry(&id) {
+                        (entry.created_at, now)
+                    } else {
+                        (now, now)
+                    };
+
+                    match Note::from_markdown(
+                        id,
+                        filename.clone(),
+                        content.clone(),
+                        extracted_tags.clone(),
+                        created_at,
+                        updated_at,
+                    ) {
+                        Ok(note) => {
+                            // UUID가 파일에 없으면 추가
+                            if !Note::has_uuid_in_frontmatter(&content) {
+                                if let Err(e) = self.inject_uuid_to_file(&path, &note) {
+                                    eprintln!("⚠️  UUID 주입 실패 {}: {}", filename, e);
+                                } else {
+                                    println!("✏️  UUID 추가됨: {} ({})", filename, note.id);
+                                }
                             }
+
+                            // 인덱스 업데이트 (추출된 태그 사용)
+                            let entry = IndexEntry {
+                                filename: filename.clone(),
+                                file_path: file_path.clone(),
+                                title: note.title.clone(),
+                                created_at: note.created_at,
+                                updated_at: note.updated_at,
+                                tags: extracted_tags,
+                            };
+
+                            if is_new {
+                                println!("📄 새 노트 발견: {}", filename);
+                            }
+
+                            self.index.add_entry(id, entry);
+                            self.notes.insert(id, note);
                         }
-
-                        // 인덱스 업데이트 (새 파일이거나 메타데이터 변경 시)
-                        let entry = IndexEntry {
-                            filename: filename.clone(),
-                            title: note.title.clone(),
-                            created_at: note.created_at,
-                            updated_at: note.updated_at,
-                            tags: if is_new { Vec::new() } else { tags },
-                        };
-
-                        if is_new {
-                            println!("📄 새 노트 발견: {}", filename);
+                        Err(e) => {
+                            eprintln!("노트 파싱 실패 {}: {}", filename, e);
                         }
-
-                        self.index.add_entry(id, entry);
-                        self.notes.insert(id, note);
-                    }
-                    Err(e) => {
-                        eprintln!("노트 파싱 실패 {}: {}", filename, e);
                     }
                 }
             }
@@ -133,25 +153,43 @@ impl NoteApp {
 
     // 파일 시스템과 인덱스 동기화
     pub fn sync_with_filesystem(&mut self) -> Result<(), String> {
-        // 1. 현재 파일 목록 가져오기
+        // 1. 모든 watched_folders에서 현재 파일 목록 가져오기
         let mut existing_files = std::collections::HashSet::new();
-        let entries =
-            fs::read_dir(&self.notes_dir).map_err(|e| format!("디렉토리 읽기 실패: {}", e))?;
 
-        for entry in entries {
-            let entry = entry.map_err(|e| format!("엔트리 읽기 실패: {}", e))?;
-            let path = entry.path();
+        for folder_path in self.index.get_watched_folders().clone() {
+            let folder = PathBuf::from(&folder_path);
+            if !folder.exists() {
+                continue;
+            }
 
-            if path.extension().and_then(|s| s.to_str()) == Some("md") {
-                let filename = entry.file_name().to_string_lossy().to_string();
-                existing_files.insert(filename);
+            let entries = fs::read_dir(&folder)
+                .map_err(|e| format!("디렉토리 읽기 실패 {}: {}", folder_path, e))?;
+
+            for entry in entries {
+                let entry = entry.map_err(|e| format!("엔트리 읽기 실패: {}", e))?;
+                let path = entry.path();
+
+                if path.extension().and_then(|s| s.to_str()) == Some("md") {
+                    let file_path = path.to_string_lossy().to_string();
+                    existing_files.insert(file_path);
+                }
             }
         }
 
         // 2. 인덱스에서 삭제된 파일 제거
         let mut to_remove = Vec::new();
         for (id, entry) in self.index.mappings.iter() {
-            if !existing_files.contains(&entry.filename) {
+            let entry_path = if entry.file_path.is_empty() {
+                // 구버전 호환: file_path가 없으면 notes_dir + filename 사용
+                self.notes_dir
+                    .join(&entry.filename)
+                    .to_string_lossy()
+                    .to_string()
+            } else {
+                entry.file_path.clone()
+            };
+
+            if !existing_files.contains(&entry_path) {
                 println!("🗑️  삭제된 노트 감지: {}", entry.filename);
                 to_remove.push(*id);
             }
@@ -245,5 +283,63 @@ impl NoteApp {
             .into_iter()
             .filter(|tag| tag.starts_with('@'))
             .collect()
+    }
+
+    // 새로운 폴더를 watched_folders에 추가
+    pub fn add_watched_folder(&mut self, folder_path: String) -> Result<(), String> {
+        let folder = PathBuf::from(&folder_path);
+
+        // 폴더 존재 여부 확인
+        if !folder.exists() {
+            return Err(format!("폴더가 존재하지 않습니다: {}", folder_path));
+        }
+
+        // 이미 추가되어 있는지 확인
+        if self.index.get_watched_folders().contains(&folder_path) {
+            return Err(format!("이미 추가된 폴더입니다: {}", folder_path));
+        }
+
+        // 폴더 추가
+        self.index.add_watched_folder(folder_path.clone());
+
+        // 인덱스 저장
+        self.save_index()?;
+
+        // 노트 다시 로드
+        self.load_notes()?;
+
+        Ok(())
+    }
+
+    // watched_folders에서 폴더 제거
+    pub fn remove_watched_folder(&mut self, folder_path: &str) -> Result<(), String> {
+        if !self.index.remove_watched_folder(folder_path) {
+            return Err(format!("폴더를 찾을 수 없습니다: {}", folder_path));
+        }
+
+        // 해당 폴더의 노트들을 인덱스에서 제거
+        let mut to_remove = Vec::new();
+        for (id, entry) in self.index.mappings.iter() {
+            if entry.file_path.starts_with(folder_path) {
+                to_remove.push(*id);
+            }
+        }
+
+        for id in to_remove {
+            self.index.remove_entry(&id);
+        }
+
+        // 인덱스 저장
+        self.save_index()?;
+
+        // 노트 다시 로드
+        self.load_notes()?;
+
+        Ok(())
+    }
+
+    // 관리 중인 폴더 목록 가져오기
+    pub fn list_watched_folders(&self) -> &Vec<String> {
+        self.index.get_watched_folders()
     }
 }

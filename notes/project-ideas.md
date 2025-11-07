@@ -7,6 +7,8 @@ id: 9f9c693e-4c3e-4539-9773-ef843cb89a51
 
 A collection of interesting project ideas to work on.
 
+Tags: @projects #ideas #todo
+
 ## Web Development
 
 - Build a real-time chat application using WebSockets
