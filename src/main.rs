@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         println!(
-            "\n명령어: [l]ist, [s]how <번호>, [se]arch <검색어>, [t]ags, [f]olders, [a]dd-folder <경로>, [r]efresh, [q]uit"
+            "\n명령어: [l]ist, <번호>, [s]how <번호>, [se]arch <검색어>, [t]ags, [f]olders, [a]dd-folder <경로>, [r]efresh, [q]uit"
         );
         print!("> ");
         io::stdout().flush()?;
