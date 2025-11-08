@@ -1,5 +1,5 @@
 [package]
-name = "MD_Filer"
+name = "md_filer"
 version = "0.1.0"
 edition = "2024"
 description = "An app for managing md files, written in Rust."

@@ -8,7 +8,7 @@ fn create_test_note(dir: &PathBuf, filename: &str, content: &str) {
     fs::write(path, content).expect("Failed to write test file");
 }
 
-fn create_test_app() -> (TempDir, MD_Filer::app::NoteApp) {
+fn create_test_app() -> (TempDir, md_filer::app::NoteApp) {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let notes_dir = temp_dir.path().to_path_buf();
 
@@ -49,7 +49,7 @@ This note is about web development."#,
 This note has no frontmatter."#,
     );
 
-    let app = MD_Filer::app::NoteApp::new(notes_dir).expect("Failed to create app");
+    let app = md_filer::app::NoteApp::new(notes_dir).expect("Failed to create app");
     (temp_dir, app)
 }
 
@@ -124,12 +124,12 @@ fn test_index_persistence() {
     // 첫 번째 앱 생성 및 노트 추가
     create_test_note(&notes_dir, "persistent.md", "# Persistent Note");
     {
-        let app = MD_Filer::app::NoteApp::new(notes_dir.clone()).expect("Failed to create app");
+        let app = md_filer::app::NoteApp::new(notes_dir.clone()).expect("Failed to create app");
         assert_eq!(app.list_notes().len(), 1);
     }
 
     // 새 앱 인스턴스 생성 - 인덱스가 유지되는지 확인
-    let app2 = MD_Filer::app::NoteApp::new(notes_dir).expect("Failed to create app");
+    let app2 = md_filer::app::NoteApp::new(notes_dir).expect("Failed to create app");
     assert_eq!(app2.list_notes().len(), 1);
 
     // 인덱스 파일이 생성되었는지 확인
@@ -157,7 +157,7 @@ updated_at: 2024-01-01T00:00:00Z
 This is a test note."#,
     );
 
-    let mut app = MD_Filer::app::NoteApp::new(notes_dir).expect("Failed to create app");
+    let mut app = md_filer::app::NoteApp::new(notes_dir).expect("Failed to create app");
 
     // 인덱스에 태그 수동 추가 (실제로는 별도 명령어로 추가)
     if let Some(note) = app.list_notes().first() {
@@ -201,7 +201,7 @@ This note has no UUID in frontmatter."#,
     );
 
     // 앱 생성 (UUID 자동 주입됨)
-    let app = MD_Filer::app::NoteApp::new(notes_dir.clone()).expect("Failed to create app");
+    let app = md_filer::app::NoteApp::new(notes_dir.clone()).expect("Failed to create app");
     assert_eq!(app.list_notes().len(), 1);
 
     // 파일 다시 읽어서 UUID가 추가되었는지 확인
@@ -210,7 +210,7 @@ This note has no UUID in frontmatter."#,
 
     // UUID가 frontmatter에 있는지 확인
     assert!(content.contains("id:"));
-    assert!(MD_Filer::note::Note::has_uuid_in_frontmatter(&content));
+    assert!(md_filer::note::Note::has_uuid_in_frontmatter(&content));
 }
 
 #[test]
@@ -238,7 +238,7 @@ This note already has a UUID."#,
     );
 
     // 앱 생성
-    let app = MD_Filer::app::NoteApp::new(notes_dir.clone()).expect("Failed to create app");
+    let app = md_filer::app::NoteApp::new(notes_dir.clone()).expect("Failed to create app");
     assert_eq!(app.list_notes().len(), 1);
 
     // 노트의 UUID가 원본과 같은지 확인
@@ -266,7 +266,7 @@ This is content without any frontmatter."#,
     );
 
     // 앱 생성 (frontmatter와 UUID 자동 추가됨)
-    let app = MD_Filer::app::NoteApp::new(notes_dir.clone()).expect("Failed to create app");
+    let app = md_filer::app::NoteApp::new(notes_dir.clone()).expect("Failed to create app");
     assert_eq!(app.list_notes().len(), 1);
 
     // 파일 다시 읽기
@@ -277,8 +277,8 @@ This is content without any frontmatter."#,
     assert!(content.starts_with("---\n"));
     assert!(content.contains("title:"));
     assert!(content.contains("id:"));
-    assert!(MD_Filer::note::Note::has_frontmatter(&content));
-    assert!(MD_Filer::note::Note::has_uuid_in_frontmatter(&content));
+    assert!(md_filer::note::Note::has_frontmatter(&content));
+    assert!(md_filer::note::Note::has_uuid_in_frontmatter(&content));
 }
 
 #[test]
@@ -300,7 +300,7 @@ This note has frontmatter but no title field."#,
     );
 
     // 앱 생성 (title 자동 추출됨)
-    let app = MD_Filer::app::NoteApp::new(notes_dir.clone()).expect("Failed to create app");
+    let app = md_filer::app::NoteApp::new(notes_dir.clone()).expect("Failed to create app");
     assert_eq!(app.list_notes().len(), 1);
 
     let note = app.list_notes()[0].1;
@@ -329,7 +329,7 @@ Just some plain text without any heading."#,
     );
 
     // 앱 생성 (파일명에서 title 추출됨)
-    let app = MD_Filer::app::NoteApp::new(notes_dir.clone()).expect("Failed to create app");
+    let app = md_filer::app::NoteApp::new(notes_dir.clone()).expect("Failed to create app");
     assert_eq!(app.list_notes().len(), 1);
 
     let note = app.list_notes()[0].1;
